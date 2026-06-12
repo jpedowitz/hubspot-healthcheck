@@ -21,7 +21,13 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 
 const PORT = process.env.PORT || 3000;
-const HS_BASE = "https://api.hubapi.com";
+
+// EU-hosted portals issue pat-eu1- tokens and live on a different API host.
+function hubspotBase(token) {
+  return (typeof token === "string" && token.toLowerCase().indexOf("pat-eu1-") === 0)
+    ? "https://api-eu1.hubapi.com"
+    : "https://api.hubapi.com";
+}
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
   "https://www.pedowitzgroup.com,https://pedowitzgroup.com")
@@ -44,9 +50,9 @@ function corsHeaders(req, res) {
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 
-app.options("/hs", (req, res) => { corsHeaders(req, res); res.sendStatus(204); });
+app.options(/.*/, (req, res) => { corsHeaders(req, res); res.sendStatus(204); });
 
-app.get("/", (req, res) => res.json({ ok: true, service: "tpg-hs-health-check-proxy" }));
+app.get("/", (req, res) => { corsHeaders(req, res); res.json({ ok: true, service: "tpg-hs-health-check-proxy", endpoint: "POST /hs" }); });
 
 app.post("/hs", async (req, res) => {
   corsHeaders(req, res);
@@ -65,7 +71,7 @@ app.post("/hs", async (req, res) => {
     return res.status(400).json({ error: "Path not allowed: " + String(path).slice(0, 80) });
   }
 
-  const url = new URL(HS_BASE + path);
+  const url = new URL(hubspotBase(token) + path);
   if (query && typeof query === "object") {
     for (const [k, v] of Object.entries(query)) {
       if (v != null) url.searchParams.set(k, String(v));
@@ -88,6 +94,11 @@ app.post("/hs", async (req, res) => {
   } catch (e) {
     return res.status(502).json({ error: "Upstream error: " + e.message });
   }
+});
+
+app.use((req, res) => {
+  corsHeaders(req, res);
+  res.status(404).json({ error: "Not found. The relay endpoint is POST /hs", path: req.path });
 });
 
 app.listen(PORT, () => {
