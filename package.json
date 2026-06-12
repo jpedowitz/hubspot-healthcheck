@@ -1,0 +1,9 @@
+{
+  "name": "tpg-hs-health-check-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "main": "proxy-server.js",
+  "scripts": { "start": "node proxy-server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "express": "^4.19.2" }
+}
